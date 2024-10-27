@@ -26,7 +26,10 @@ public class TransactionService {
     @Autowired
     private RestTemplate restTemplate; // realiza chamadas http para microserviços
 
-    public void createTransaction(TransactionDTO transactionDTO) throws Exception{
+    @Autowired
+    private NotificationService notificationService;
+
+    public Transaction createTransaction(TransactionDTO transactionDTO) throws Exception{
         User sender = this.userService.findUserById(transactionDTO.senderId());
         User receiver = this.userService.findUserById(transactionDTO.receiverId());
 
@@ -38,18 +41,23 @@ public class TransactionService {
             throw new Exception("Transação não autorizada.");
         }
 
-        Transaction transaction = new Transaction();
-        transaction.setAmount(transactionDTO.value());
-        transaction.setSender(sender);
-        transaction.setReceiver(receiver);
-        transaction.setTimestamp(LocalDateTime.now());
+        Transaction newTransaction = new Transaction();
+        newTransaction.setAmount(transactionDTO.value());
+        newTransaction.setSender(sender);
+        newTransaction.setReceiver(receiver);
+        newTransaction.setTimestamp(LocalDateTime.now());
 
         sender.setBalance(sender.getBalance().subtract(transactionDTO.value()));
         receiver.setBalance(sender.getBalance().add(transactionDTO.value()));
 
-        transactionRepository.save(transaction);
+        transactionRepository.save(newTransaction);
         userService.saveUser(sender);
         userService.saveUser(receiver);
+
+        this.notificationService.sendNotification(sender, "Transação realizada com sucesso.");
+        this.notificationService.sendNotification(receiver, "Transação recebida com sucesso.");
+
+        return newTransaction;
     }
 
     public boolean authorizeTransaction(User sender, BigDecimal value){
